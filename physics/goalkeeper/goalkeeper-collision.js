@@ -4,7 +4,7 @@
  */
 
 import * as THREE from "three";
-import { RAIO_BOLA } from "../../config.js";
+import { RAIO_BOLA, GOLEIRO_RAIO_COLISAO, GOLEIRO_ESCALA } from "../../config.js";
 
 /**
  * Verifica e trata colisão da bola com o goleiro
@@ -33,10 +33,10 @@ export function checkGoalkeeperCollision(
       Math.pow(ballPos.z - gkPos.z, 2)
   );
 
-  // Raio de colisão do goleiro (aproximado)
-  const gkRadius = 0.6;
+  // Raio de colisão do goleiro (base * escala)
+  const gkCollisionRadius = GOLEIRO_RAIO_COLISAO * GOLEIRO_ESCALA;
 
-  if (distance < RAIO_BOLA + gkRadius) {
+  if (distance < RAIO_BOLA + gkCollisionRadius) {
     // Defesa! Bola volta
     const normal = new THREE.Vector3(
       ballPos.x - gkPos.x,
@@ -45,9 +45,9 @@ export function checkGoalkeeperCollision(
     ).normalize();
 
     // Reposiciona a bola
-    ballPos.x = gkPos.x + normal.x * (RAIO_BOLA + gkRadius);
-    ballPos.y = gkPos.y + normal.y * (RAIO_BOLA + gkRadius);
-    ballPos.z = gkPos.z + normal.z * (RAIO_BOLA + gkRadius);
+    ballPos.x = gkPos.x + normal.x * (RAIO_BOLA + gkCollisionRadius);
+    ballPos.y = gkPos.y + normal.y * (RAIO_BOLA + gkCollisionRadius);
+    ballPos.z = gkPos.z + normal.z * (RAIO_BOLA + gkCollisionRadius);
 
     // Reflete a velocidade (defesa)
     const dot =

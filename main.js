@@ -8,7 +8,9 @@ import * as THREE from "three";
 // Importações de módulos
 import {
   VELOCIDADE_BOLA,
-  FORCA_INICIAL_Y,
+  ALTURA_CHUTE_PADRAO,
+  ALTURA_CHUTE_MINIMA,
+  ALTURA_CHUTE_MAXIMA,
   CURVA_FISICA_BOLA,
   RAIO_BOLA,
   VELOCIDADE_BARRA_FORCA,
@@ -31,7 +33,7 @@ import { scene, camera, render } from "./rendering/renderer.js";
 import { createField } from "./objects/field.js";
 import { createBarrier, randomizeBarrierPosition } from "./objects/barrier.js";
 import { createGoal } from "./objects/goal.js";
-import { createGoalkeeper, resetGoalkeeper } from "./objects/goalkeeper.js";
+import { createGoalkeeper, resetGoalkeeper, positionGoalkeeperOpposite } from "./objects/goalkeeper.js";
 import { createBall, createAimGroup } from "./objects/ball.js";
 import {
   initArrow,
@@ -57,7 +59,7 @@ import { checkGoalkeeperCollision } from "./physics/goalkeeper/goalkeeper-collis
 import { checkBarrierCollision } from "./physics/barrier/barrier-collision.js";
 import {
   randomizeWind,
-  getWindForce,
+  getWindComponents,
   getWindInfo,
 } from "./physics/wind.js";
 
@@ -65,11 +67,12 @@ import {
 createField(scene);
 
 const barrier = createBarrier(scene);
-randomizeBarrierPosition(barrier);
-
 const goal = createGoal(scene);
-
 const goalkeeper = createGoalkeeper(scene);
+
+// Posiciona barreira e goleiro no lado oposto
+const barrierSide = randomizeBarrierPosition(barrier);
+positionGoalkeeperOpposite(goalkeeper.group, barrierSide);
 
 const groundLevel = -0.5;
 const aimGroupData = createAimGroup(scene, groundLevel);
@@ -87,9 +90,9 @@ let ballVelocity = new THREE.Vector3();
 // Estado da mira
 const rotationStep = Math.PI / 180; // 1 grau em radianos (incremento de 1 em 1)
 const powerStep = 0.01; // Incremento de 1 no display (0.01 * 100 = 1)
-const minPowerY = 0.1;
-const maxPowerY = 0.5;
-const defaultPowerY = FORCA_INICIAL_Y;
+const minPowerY = ALTURA_CHUTE_MINIMA;
+const maxPowerY = ALTURA_CHUTE_MAXIMA;
+const defaultPowerY = ALTURA_CHUTE_PADRAO;
 let kickPowerY = defaultPowerY;
 
 const curveStep = 0.02; // Incremento de 2 no display (0.02 * 100 = 2)
@@ -157,8 +160,14 @@ function resetBall() {
   goalScored = false;
   ballInNet = false;
 
-  // Reseta goleiro
+  // Reposiciona barreira e goleiro no lado oposto (ANTES de resetar tudo)
+  const barrierSide = randomizeBarrierPosition(barrier);
+
+  // Reseta goleiro para centro
   resetGoalkeeper(goalkeeper.group, goalkeeper.initialPosition);
+  // Depois posiciona no lado oposto da barreira
+  positionGoalkeeperOpposite(goalkeeper.group, barrierSide);
+
   goalkeeperState.targetX = 0;
   goalkeeperState.targetY = 0.5;
   goalkeeperState.reactionCounter = 0;
@@ -177,13 +186,10 @@ function resetBall() {
   isChargingPower = false;
   hidePowerBar();
 
-  // Reposiciona barreira aleatoriamente
-  randomizeBarrierPosition(barrier);
-
   // Randomiza vento
   randomizeWind();
   const windInfo = getWindInfo();
-  updateWindIndicator(windInfo.direction, windInfo.speedPercent);
+  updateWindIndicator(windInfo);
 
   aimGroup.visible = true;
   hideGoalMessage();
@@ -360,9 +366,9 @@ function animate() {
   processKeyInput();
 
   if (ballKicked && !goalScored) {
-    // Aplica física da bola (com vento)
-    const windForce = getWindForce();
-    applyBallPhysics(ballVelocity, ball, kickCurveAmount, curveFactor, scene, windForce);
+    // Aplica física da bola (com vento ponderado)
+    const windComponents = getWindComponents();
+    applyBallPhysics(ballVelocity, ball, kickCurveAmount, curveFactor, scene, windComponents);
 
     // Atualiza IA do goleiro
     const predictedPos = predictBallPositionAtGoal(
@@ -373,7 +379,7 @@ function animate() {
       curveFactor
     );
     updateGoalkeeperAI(ballKicked, goalScored, goalkeeperState, predictedPos);
-    moveGoalkeeper(goalkeeper.group, goalkeeperState);
+    moveGoalkeeper(goalkeeper.group, goalkeeperState, ball);
 
     // Verifica colisões
     checkGroundBounce(ball, ballVelocity, groundLevel);
@@ -401,6 +407,7 @@ function animate() {
       resetBall();
     }
   }
+  // Goleiro só se move quando a bola é chutada (não volta ao centro antes do chute)
 
   // Física da bola quando está na rede após o gol
   if (ballInNet) {

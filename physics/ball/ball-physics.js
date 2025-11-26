@@ -37,13 +37,13 @@ export function calculateMagnusEffect(ballVelocity, kickCurveAmount) {
 }
 
 /**
- * Aplica física à bola (gravidade, curva, efeito Magnus, vento)
+ * Aplica física à bola com sistema de vento ponderado
  * @param {THREE.Vector3} ballVelocity - Vetor de velocidade da bola
  * @param {THREE.Mesh} ball - Mesh da bola
  * @param {number} kickCurveAmount - Quantidade de curva do chute
  * @param {number} curveFactor - Fator de curva da física
  * @param {THREE.Scene} scene - Cena do Three.js
- * @param {THREE.Vector3} windForce - Força do vento (opcional)
+ * @param {Object} windComponents - { eastWest: número, northSouth: número }
  */
 export function applyBallPhysics(
   ballVelocity,
@@ -51,30 +51,39 @@ export function applyBallPhysics(
   kickCurveAmount,
   curveFactor,
   scene,
-  windForce = null
+  windComponents = null
 ) {
-  // 1. Calcula forças individualmente
+  // 1. Calcula força de curva base
   const curveForce = calculateCurveForce(ballVelocity, kickCurveAmount, curveFactor, scene.up);
-  const magnusLift = calculateMagnusEffect(ballVelocity, kickCurveAmount);
 
-  // 2. Aplica curva horizontal e Magnus vertical
-  if (kickCurveAmount !== 0) {
+  // 2. Adiciona vento leste-oeste à força de curva (maior impacto)
+  if (windComponents && windComponents.eastWest !== 0) {
+    curveForce.x += windComponents.eastWest;
+  }
+
+  // 3. Aplica curva combinada (curva + vento horizontal)
+  if (kickCurveAmount !== 0 || (windComponents && windComponents.eastWest !== 0)) {
     ballVelocity.add(curveForce);
-    ballVelocity.y += magnusLift; // Magnus agora proporcional à velocidade
   }
 
-  // 3. Aplica vento (força externa)
-  if (windForce) {
-    ballVelocity.add(windForce);
+  // 4. Calcula e aplica efeito Magnus (sustentação vertical)
+  if (kickCurveAmount !== 0) {
+    const magnusLift = calculateMagnusEffect(ballVelocity, kickCurveAmount);
+    ballVelocity.y += magnusLift;
   }
 
-  // 4. Aplica gravidade
+  // 5. Aplica vento norte-sul (menor impacto, afeta direção)
+  if (windComponents && windComponents.northSouth !== 0) {
+    ballVelocity.z += windComponents.northSouth;
+  }
+
+  // 6. Aplica gravidade
   ballVelocity.add(gravity);
 
-  // 5. Atualiza posição
+  // 7. Atualiza posição
   ball.position.add(ballVelocity);
 
-  // 6. Rotação visual baseada na velocidade
+  // 8. Rotação visual baseada na velocidade
   const rotationSpeed = 0.1;
   ball.rotation.x += ballVelocity.length() * rotationSpeed;
 }

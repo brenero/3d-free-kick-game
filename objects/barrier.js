@@ -38,6 +38,7 @@ export function createBarrier(scene) {
 /**
  * Posiciona a barreira aleatoriamente (nunca no centro)
  * @param {THREE.Mesh} barrier - Mesh da barreira
+ * @returns {number} - Lado da barreira: -1 (esquerda) ou 1 (direita)
  */
 export function randomizeBarrierPosition(barrier) {
   // Gera um número aleatório entre MIN e MAX
@@ -49,4 +50,6 @@ export function randomizeBarrierPosition(barrier) {
   const barrierX = side * offset;
 
   barrier.position.set(barrierX, BARREIRA_ALTURA / 2 - 0.5, BARREIRA_Z);
+
+  return side; // Retorna o lado para posicionar o goleiro
 }
